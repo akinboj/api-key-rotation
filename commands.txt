@@ -1,0 +1,15 @@
+kubectl create secret generic jwk-gateway-api-secrets --from-literal=keyPassword="Peg@cornK4JwGpiE" --from-literal=truststorePassword="Peg@cornTrustSt0re" --namespace=site-a
+
+# Go library could not handle the encrypted private keys in Microsoft format.
+# Keys were decrypted
+openssl pkcs12 -in jwk-gateway-api.site-a.pfx -nocerts -nodes -passin pass:Peg@cornK4JwGpiE -out jwk-gateway-api.site-a-key.pem
+openssl pkcs12 -in jwk-gateway-api.site-a.pfx -nokeys -passin pass:Peg@cornK4JwGpiE -out jwk-gateway-api.site-a.pem
+
+# Build the Go package
+go clean -modcache
+go mod init jwk-service
+go mod tidy
+
+docker build --rm --build-arg IMAGE_BUILD_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S')" -t jwk-service-api:1.0.0-snapshot .
+
+helm upgrade jwk-gateway-api-site-a --install --namespace site-a --set serviceName=jwk-gateway-api,basePort=30015,hostPathCerts=/Users/yemie/dev/data/jwkset,imageTag=1.0.0-snapshot,numOfPods=1 helm

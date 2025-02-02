@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    {{- if (.Values.dnsEntry) }}
+    # From https://docs.microsoft.com/en-us/azure/aks/internal-lb#create-an-internal-load-balancer
+    service.beta.kubernetes.io/azure-load-balancer-internal: "{{ .Values.loadBalancerInternal | default true }}"
+    # From https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/rfc2136.md
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.dnsEntry }}
+    {{- end }}
+  labels:
+    app: {{ .Values.serviceName }}
+    version: "{{ .Values.imageTag }}"
+  name: {{ .Values.serviceName }}
+spec:
+  ports:
+  - name: https
+    port: {{ add 0 .Values.basePort }}
+    protocol: TCP
+    targetPort: 8443
+    {{- if eq .Values.serviceType "NodePort"}}
+    nodePort: {{ add 0 .Values.basePort }}
+    {{- end }}
+  selector:
+    app: {{ .Values.serviceName }}
+  type: {{ .Values.serviceType | default "LoadBalancer" }}
+  {{- if (.Values.loadBalancerIP) }}
+  loadBalancerIP: {{ .Values.loadBalancerIP }}
+  {{- end }}

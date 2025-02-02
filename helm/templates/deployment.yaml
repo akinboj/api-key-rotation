@@ -1,0 +1,115 @@
+---
+apiVersion: apps/v1 
+kind: Deployment
+metadata:
+  annotations:
+    fabric8.io/metrics-path: dashboard/file/camel-routes.json/?var-project={{ .Values.serviceName }}&var-version={{ .Values.imageTag }}
+  labels:
+    app: {{ .Values.serviceName }}
+    version: "{{ .Values.imageTag }}"
+  name: {{ .Values.serviceName }}
+spec:
+  replicas: {{ .Values.numOfPods | default 2 }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: {{ .Values.serviceName }}
+  template:
+    metadata:
+      annotations:
+        fabric8.io/metrics-path: dashboard/file/camel-routes.json/?var-project={{ .Values.serviceName }}&var-version={{ .Values.imageTag }}
+      labels:
+        app: {{ .Values.serviceName }}
+        version: "{{ .Values.imageTag }}"
+        date: "{{ date "20060102-150405" .Release.Time }}"
+    spec:
+      # serviceAccountName: jgroups-kubeping-service-account
+      {{- if (.Values.acrSecretName) }} 
+      imagePullSecrets:
+        - name: {{ .Values.acrSecretName }}
+      {{- end }}
+      containers:
+      - env:
+        {{- if (.Values.dnsEntry) }} 
+        - name: DNS_ENTRY
+          value: {{ .Values.dnsEntry }}
+        - name: {{ upper .Values.serviceName | replace "-" "_" }}_{{ upper .Release.Namespace | replace "-" "_" }}_DNS_ENTRY
+          value: {{ .Values.dnsEntry }}
+        {{- end }}
+        {{- if (.Values.externalDnsEntry) }} 
+        - name: EXTERNAL_DNS_ENTRY
+          value: {{ .Values.externalDnsEntry }}
+        - name: {{ upper .Values.serviceName | replace "-" "_" }}_{{ upper .Release.Namespace | replace "-" "_" }}_EXTERNAL_DNS_ENTRY
+          value: {{ .Values.externalDnsEntry }}
+        {{- end }}
+        - name: KEY_PASSWORD
+          valueFrom:
+           secretKeyRef:
+            name: {{ .Values.serviceName }}-secrets
+            key: keyPassword
+        - name: KUBERNETES_SERVICE_NAME
+          value: {{ .Values.serviceName }}
+        - name: {{ upper .Values.serviceName | replace "-" "_" }}_{{ upper .Release.Namespace | replace "-" "_" }}_KUBERNETES_SERVICE_NAME
+          value: {{ .Values.serviceName }}
+        - name: KUBERNETES_NAMESPACE
+          value: {{ .Release.Namespace }}
+        - name: {{ upper .Values.serviceName | replace "-" "_" }}_{{ upper .Release.Namespace | replace "-" "_" }}_KUBERNETES_NAMESPACE
+          value: {{ .Release.Namespace }}
+        - name: HELM_RELEASE_TIME
+          value: "{{ date "20060102-150405" .Release.Time }}"
+        - name: MY_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: MY_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: MY_POD_SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
+        image: {{ .Values.dockerRepo }}jwk-service-api:{{ .Values.imageTag }}            
+        imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 30
+        name: jwkservice
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        - containerPort: 9779
+          name: prometheus
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 10
+        securityContext:
+          privileged: false
+        volumeMounts:
+        - name: certificates
+          mountPath: /app/certs    
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
+      volumes:
+      - name: certificates
+        hostPath:
+          path: {{ .Values.hostPathCerts }}
