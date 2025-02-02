@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: JWK URL Set - API
+version: 1.0.0-SNAPSHOT
+description: JWK Key Rotation server
+icon: img/icons/go.svg
